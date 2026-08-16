@@ -1,0 +1,38 @@
+# The one resource applied manually, once - same bootstrap pattern gitops-cluster-dev/
+# root-app-of-apps.yaml and gitops-cluster-kind-prod/root-app-of-apps.yaml already
+# establish. ArgoCD itself is NOT bootstrapped here - kind-observe already runs a live
+# ArgoCD instance predating this repo by weeks (platform-cicd's own control plane,
+# holmesgpt, order-processing-service, payment-service). Reusing it: same single-
+# instance-for-now precedent already used on kind-dev and kind-prod (the argocd-
+# platform/argocd-apps split is deferred here too - this repo currently carries no
+# content of its own, see README's "Repo boundary only, not a migration" section).
+#
+# REMINDER (same gotcha the other two roots already document): this Application's own
+# .spec does NOT self-update from git - after editing this glob, gitops-cluster-kind-
+# observe-root itself needs a manual hard-refresh before its newly-includable children
+# get discovered.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gitops-cluster-kind-observe-root
+  namespace: argocd
+  labels:
+    platform.io/component: cluster-config
+    platform.io/subcomponent: app-of-apps
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/jfillman/gitops-cluster-kind-observe.git
+    targetRevision: main
+    path: .
+    directory:
+      recurse: true
+      include: "{**/application.yaml,**/packages-application.yaml,**/applicationset.yaml}"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
